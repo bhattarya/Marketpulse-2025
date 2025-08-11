@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import IntelligenceWidget from "../components/IntelligenceWidget";
-import Intelligence from "./Intelligence";
 
 /* ---------- helpers ---------- */
 const fetchJSON = async (url) => {
@@ -95,7 +95,7 @@ function AssetCard({ name, symbol, price, changePct, volume, isLarge = false }) 
   );
 }
 
-function NewsCard({ title, url, source, summary, sentiment, publishedAt }) {
+function NewsCard({ title, url, source, summary, sentiment, impact, key_metrics, publishedAt, ai_enhanced }) {
   const sentimentColor = 
     sentiment?.toLowerCase() === 'positive' ? 'text-green-600 bg-green-50' :
     sentiment?.toLowerCase() === 'negative' ? 'text-red-600 bg-red-50' :
@@ -104,11 +104,19 @@ function NewsCard({ title, url, source, summary, sentiment, publishedAt }) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
       <div className="flex items-start justify-between mb-3">
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${sentimentColor}`}>
-          {sentiment || 'Neutral'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${sentimentColor}`}>
+            {sentiment || 'Neutral'}
+          </span>
+          {ai_enhanced && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-medium text-purple-700">AI</span>
+            </div>
+          )}
+        </div>
         <div className="text-right text-xs text-gray-500">
-          <p>{source}</p>
+          <p className="font-medium">{source}</p>
           <p>{publishedAt ? new Date(publishedAt).toLocaleDateString() : "—"}</p>
         </div>
       </div>
@@ -120,7 +128,21 @@ function NewsCard({ title, url, source, summary, sentiment, publishedAt }) {
         className="block hover:text-green-600 transition-colors"
       >
         <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
-        <p className="text-gray-600 text-sm line-clamp-3">{summary}</p>
+        <p className="text-gray-600 text-sm line-clamp-3 mb-3">{summary}</p>
+        
+        {ai_enhanced && impact && (
+          <div className="bg-purple-50 rounded-lg p-3 mb-3">
+            <h4 className="text-xs font-semibold text-purple-800 mb-1">Market Impact</h4>
+            <p className="text-xs text-purple-700 line-clamp-2">{impact}</p>
+          </div>
+        )}
+        
+        {ai_enhanced && key_metrics && key_metrics !== "None" && key_metrics !== "No specific metrics mentioned" && (
+          <div className="bg-blue-50 rounded-lg p-2">
+            <h4 className="text-xs font-semibold text-blue-800 mb-1">Key Metrics</h4>
+            <p className="text-xs text-blue-700">{key_metrics}</p>
+          </div>
+        )}
       </a>
     </div>
   );
@@ -128,7 +150,8 @@ function NewsCard({ title, url, source, summary, sentiment, publishedAt }) {
 
 /* ---------- main page ---------- */
 export default function Dashboard() {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [crypto, setCrypto] = useState([]);
   const [stocks, setStocks] = useState({});
   const [fearGreed, setFearGreed] = useState(null);
@@ -137,10 +160,15 @@ export default function Dashboard() {
   const [loadingCrypto, setLoadingCrypto] = useState(true);
   const [loadingNews, setLoadingNews] = useState(true);
 
-  // display these tickers in the table
-  const stockSymbols = useMemo(() => ["AAPL", "TSLA", "NVDA"], []);
-  // news driver (you can wire this to an input later)
-  const newsTicker = "TSLA";
+  // Get symbol from URL params or use defaults
+  const urlSymbol = searchParams.get('symbol');
+  const stockSymbols = useMemo(() => {
+    const defaults = ["AAPL", "TSLA", "NVDA"];
+    return urlSymbol ? [urlSymbol, ...defaults.filter(s => s !== urlSymbol)].slice(0, 3) : defaults;
+  }, [urlSymbol]);
+  
+  // Show general market news instead of ticker-specific
+  const showGeneralNews = true;
 
   useEffect(() => {
     const run = async () => {
@@ -184,16 +212,16 @@ export default function Dashboard() {
         setFearGreed(null);
       }
 
-      // ---- News (Gemini summaries from your backend)
+      // ---- Dashboard News (General market news with AI analysis)
       try {
         setLoadingNews(true);
         const items = await fetchJSON(
-          `http://localhost:5000/api/news?ticker=${newsTicker}`
+          `http://localhost:5000/api/news/dashboard`
         );
         const mapped = (Array.isArray(items) ? items : []).map(normalizeNews);
         setNews(mapped);
       } catch (e) {
-        console.error("News fetch error:", e);
+        console.error("Dashboard news fetch error:", e);
         setNews([]);
       } finally {
         setLoadingNews(false);
@@ -203,58 +231,16 @@ export default function Dashboard() {
     run();
   }, [stockSymbols]); // load once on mount and when stockSymbols change
 
-  if (currentView === 'intelligence') {
-    return <Intelligence />;
-  }
+  const handleViewAll = (section) => {
+    console.log('handleViewAll called with section:', section);
+    if (section === 'intelligence') {
+      console.log('Navigating to /intelligence');
+      navigate('/intelligence');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900">MarketPulse</span>
-          </div>
-          
-          <div className="hidden md:flex items-center gap-8">
-            {[
-              { id: 'dashboard', label: 'Dashboard' },
-              { id: 'intelligence', label: 'Intelligence' },
-              { id: 'analytics', label: 'Analytics' },
-              { id: 'portfolio', label: 'Portfolio' },
-              { id: 'settings', label: 'Settings' }
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setCurrentView(item.id)}
-                className={`font-medium text-sm transition-colors ${
-                  currentView === item.id
-                    ? 'text-green-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                } ${item.id !== 'dashboard' && item.id !== 'intelligence' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                disabled={item.id !== 'dashboard' && item.id !== 'intelligence'}
-              >
-                {item.label}
-                {item.id === 'intelligence' && (
-                  <span className="ml-1 bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full text-xs font-semibold">
-                    AI
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-green-600">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-semibold">Live</span>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       <div className="p-6 max-w-7xl mx-auto">
         {/* Header */}
@@ -291,7 +277,7 @@ export default function Dashboard() {
 
         {/* Intelligence Widget */}
         <div className="mb-8">
-          <IntelligenceWidget onViewAll={setCurrentView} />
+          <IntelligenceWidget onViewAll={handleViewAll} />
         </div>
 
         {/* Main Content Grid */}
@@ -366,7 +352,10 @@ export default function Dashboard() {
                     source={n.source}
                     summary={n.summary}
                     sentiment={n.sentiment}
+                    impact={n.impact}
+                    key_metrics={n.key_metrics}
                     publishedAt={n.publishedAt}
+                    ai_enhanced={n.ai_enhanced}
                   />
                 ))
               ) : (
