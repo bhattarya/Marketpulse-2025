@@ -2,11 +2,31 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const cron = require('node-cron');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Import Phase 3 Intelligence Services
+const database = require('./mongoDatabase'); // Changed to MongoDB
+const SECDataService = require('./secData');
+const AIAnalysisService = require('./aiAnalysis');
+const GeoEventsService = require('./geoEvents');
+const EnhancedBoardroomIntelligence = require('./enhancedBoardroomIntelligence');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize Phase 3 Services
+const secService = new SECDataService();
+const aiService = new AIAnalysisService();
+const geoService = new GeoEventsService();
+const enhancedBoardroomService = new EnhancedBoardroomIntelligence();
+
+// Initialize database
+database.initialize().catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
+});
 
 // === API Caches ===
 let stockCache = {};
@@ -187,6 +207,276 @@ app.get("/api/news", async (req, res) => {
   } catch (error) {
     console.error("News Route Error:", error.message);
     res.status(500).json({ error: "Failed to fetch news" });
+  }
+});
+
+// === PHASE 3: BOARDROOM INTELLIGENCE API ===
+app.get("/api/boardroom", async (req, res) => {
+  try {
+    const ticker = (req.query.ticker || 'AAPL').toUpperCase();
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Check cache first
+    const cacheKey = `boardroom_${ticker}_${limit}`;
+    const cached = await database.getFromCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+    
+    // Try to get existing insights from database
+    let insights = await database.getBoardroomInsights(limit, ticker);
+    
+    // If no recent insights, generate new ones using enhanced service
+    if (insights.length === 0) {
+      try {
+        console.log(`Generating enhanced boardroom intelligence for ${ticker}`);
+        
+        // Use enhanced boardroom intelligence service
+        const enhancedInsights = await enhancedBoardroomService.getBoardroomIntelligence(ticker, limit);
+        
+        // Save insights to database
+        for (const insight of enhancedInsights) {
+          try {
+            const insertId = await database.saveBoardroomInsight(insight);
+            console.log(`Saved enhanced boardroom insight ${insertId} for ${ticker}`);
+          } catch (saveError) {
+            console.warn('Error saving insight:', saveError.message);
+          }
+        }
+        
+        insights = enhancedInsights;
+      } catch (enhancedError) {
+        console.error(`Enhanced boardroom intelligence error for ${ticker}:`, enhancedError.message);
+        
+        // Fallback to basic insight
+        insights = [{
+          ticker,
+          title: `${ticker} Boardroom Intelligence`,
+          summary: `Monitoring ${ticker} executive activities and corporate developments. Enhanced analysis will be available when data sources are accessible.`,
+          key_points: ['Real-time boardroom monitoring active', 'Executive decision tracking enabled'],
+          sentiment: 'neutral',
+          impact_score: 50,
+          confidence_score: 0.7,
+          filing_type: 'Enhanced Analysis',
+          created_at: new Date().toISOString()
+        }];
+      }
+    }
+    
+    // Cache the result
+    await database.setCache(cacheKey, insights, 30); // 30-minute cache
+    
+    res.json(insights);
+  } catch (error) {
+    console.error("Boardroom API Error:", error.message);
+    res.status(500).json({ 
+      error: "Error fetching boardroom intelligence",
+      ticker: req.query.ticker 
+    });
+  }
+});
+
+// === ENHANCED BOARDROOM TRENDING TOPICS API ===
+app.get("/api/boardroom/trending", async (req, res) => {
+  try {
+    const tickers = (req.query.tickers || 'AAPL,MSFT,GOOGL,TSLA,NVDA').split(',');
+    
+    // Check cache first
+    const cacheKey = `boardroom_trending_${tickers.join('_')}`;
+    const cached = await database.getFromCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+    
+    // Get trending boardroom topics
+    const trendingData = await enhancedBoardroomService.getTrendingBoardroomTopics(tickers);
+    
+    // Cache the result for 1 hour
+    await database.setCache(cacheKey, trendingData, 60);
+    
+    res.json(trendingData);
+  } catch (error) {
+    console.error("Boardroom Trending API Error:", error.message);
+    res.status(500).json({ 
+      error: "Error fetching trending boardroom topics" 
+    });
+  }
+});
+
+// === PHASE 3: GEO-EVENTS RISK ANALYZER API ===
+app.get("/api/geo-events", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const alertsOnly = req.query.alerts === 'true';
+    
+    // Check cache first
+    const cacheKey = `geo_events_${limit}_${alertsOnly}`;
+    const cached = await database.getFromCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+    
+    // Get existing events from database
+    let events = await database.getGeoEvents(limit, alertsOnly);
+    
+    // If no recent events, fetch and analyze new ones
+    if (events.length < 5) {
+      try {
+        console.log('Fetching new geo-political events');
+        
+        // Monitor for new events
+        const rawEvents = await geoService.monitorGeoEvents();
+        
+        // Analyze each event with AI
+        const analyzedEvents = [];
+        for (const rawEvent of rawEvents.slice(0, 10)) {
+          try {
+            const analysis = await aiService.analyzeGeoEvent(rawEvent);
+            const insertId = await database.saveGeoEvent(analysis);
+            analyzedEvents.push({ ...analysis, id: insertId });
+            
+            // Rate limiting between AI calls
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (eventError) {
+            console.warn('Error analyzing geo event:', eventError.message);
+            continue;
+          }
+        }
+        
+        console.log(`Analyzed and saved ${analyzedEvents.length} geo events`);
+        events = [...analyzedEvents, ...events].slice(0, limit);
+      } catch (monitorError) {
+        console.error('Geo events monitoring error:', monitorError.message);
+      }
+    }
+    
+    // Cache the result
+    await database.setCache(cacheKey, events, 15); // 15-minute cache
+    
+    res.json(events);
+  } catch (error) {
+    console.error("Geo Events API Error:", error.message);
+    res.status(500).json({ 
+      error: "Error fetching geo-political events" 
+    });
+  }
+});
+
+// === PHASE 3: INTELLIGENCE DASHBOARD API ===
+app.get("/api/intelligence", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+    
+    // Check cache first
+    const cacheKey = `intelligence_dashboard_${limit}`;
+    const cached = await database.getFromCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+    
+    // Get top insights from both boardroom and geo events
+    const [boardroomInsights, geoEvents, alerts] = await Promise.all([
+      database.getBoardroomInsights(limit),
+      database.getGeoEvents(limit, false),
+      database.getGeoEvents(5, true) // Get top 5 alerts
+    ]);
+    
+    // Combine and sort by impact/risk scores
+    const allInsights = [
+      ...boardroomInsights.map(insight => ({
+        ...insight,
+        type: 'boardroom',
+        score: insight.impact_score || 0
+      })),
+      ...geoEvents.map(event => ({
+        ...event,
+        type: 'geo-event',
+        score: event.risk_score || 0
+      }))
+    ].sort((a, b) => b.score - a.score).slice(0, limit);
+    
+    const response = {
+      topInsights: allInsights,
+      alerts: alerts,
+      summary: {
+        totalInsights: boardroomInsights.length + geoEvents.length,
+        activeAlerts: alerts.length,
+        lastUpdated: new Date().toISOString()
+      }
+    };
+    
+    // Cache for 10 minutes
+    await database.setCache(cacheKey, response, 10);
+    
+    res.json(response);
+  } catch (error) {
+    console.error("Intelligence Dashboard API Error:", error.message);
+    res.status(500).json({ 
+      error: "Error fetching intelligence dashboard data" 
+    });
+  }
+});
+
+// === DATABASE HEALTH CHECK ENDPOINT ===
+app.get("/api/health", async (req, res) => {
+  try {
+    const isHealthy = await database.isHealthy();
+    const stats = await database.getStats();
+    
+    res.json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      database: 'MongoDB',
+      stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Health check error:", error.message);
+    res.status(500).json({ 
+      status: 'unhealthy',
+      database: 'MongoDB',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// === PHASE 3: SCHEDULED TASKS ===
+// Run database cleanup daily at 2 AM
+cron.schedule('0 2 * * *', async () => {
+  console.log('🧹 Running daily database cleanup');
+  try {
+    await database.cleanup();
+  } catch (error) {
+    console.error('Database cleanup error:', error);
+  }
+});
+
+// Run geo-events monitoring every 30 minutes
+cron.schedule('*/30 * * * *', async () => {
+  console.log('Running scheduled geo-events monitoring');
+  try {
+    const rawEvents = await geoService.monitorGeoEvents();
+    console.log(`Found ${rawEvents.length} potential geo events`);
+    
+    // Process high-priority events only during scheduled runs
+    const highPriorityEvents = rawEvents.filter(event => {
+      const text = `${event.title} ${event.description}`.toLowerCase();
+      return ['crisis', 'emergency', 'fed', 'federal reserve', 'tariff'].some(
+        keyword => text.includes(keyword)
+      );
+    });
+    
+    for (const event of highPriorityEvents.slice(0, 5)) {
+      try {
+        const analysis = await aiService.analyzeGeoEvent(event);
+        await database.saveGeoEvent(analysis);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limit
+      } catch (error) {
+        console.warn('Error processing scheduled geo event:', error.message);
+      }
+    }
+  } catch (error) {
+    console.error('Scheduled geo-events monitoring error:', error);
   }
 });
 
