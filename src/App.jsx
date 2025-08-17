@@ -1,5 +1,6 @@
 import { useNavigate, NavLink, Outlet } from 'react-router-dom';
 import { useState } from 'react';
+import Footer from './components/Footer';
 
 function Navigation() {
   const navigate = useNavigate();
@@ -37,7 +38,18 @@ function Navigation() {
   const selectStock = (stock) => {
     setSearchQuery('');
     setShowSearchResults(false);
-    navigate(`/?symbol=${stock.symbol}`);
+    navigate(`/stock/${stock.symbol}`);
+  };
+
+  const addStockToDashboard = (stock, event) => {
+    event.stopPropagation();
+    // Add stock to dashboard by updating URL with multiple symbols
+    const currentSymbol = new URLSearchParams(window.location.search).get('symbol');
+    const symbols = currentSymbol ? [currentSymbol, stock.symbol] : [stock.symbol];
+    const uniqueSymbols = [...new Set(symbols)].slice(0, 5); // Max 5 symbols
+    navigate(`/?symbols=${uniqueSymbols.join(',')}`);
+    setSearchQuery('');
+    setShowSearchResults(false);
   };
 
   return (
@@ -46,10 +58,61 @@ function Navigation() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
+            <div className="w-10 h-10 relative">
+              <svg viewBox="0 0 40 40" className="w-full h-full">
+                {/* Background gradient circle */}
+                <defs>
+                  <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#10b981" />
+                    <stop offset="100%" stopColor="#059669" />
+                  </linearGradient>
+                  <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#10b981" />
+                  </linearGradient>
+                </defs>
+                
+                {/* Main circle */}
+                <circle cx="20" cy="20" r="18" fill="url(#logoGradient)" className="drop-shadow-sm"/>
+                
+                {/* Pulse waves */}
+                <circle cx="20" cy="20" r="12" fill="none" stroke="url(#pulseGradient)" strokeWidth="1" opacity="0.6">
+                  <animate attributeName="r" values="8;16;8" dur="2s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="20" cy="20" r="8" fill="none" stroke="url(#pulseGradient)" strokeWidth="1" opacity="0.4">
+                  <animate attributeName="r" values="4;12;4" dur="2s" begin="0.5s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" begin="0.5s" repeatCount="indefinite"/>
+                </circle>
+                
+                {/* Market trend line */}
+                <path d="M8 25 L12 22 L16 18 L20 15 L24 12 L28 16 L32 13" 
+                      stroke="white" 
+                      strokeWidth="2" 
+                      fill="none" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      className="drop-shadow-sm"/>
+                
+                {/* Data points */}
+                <circle cx="12" cy="22" r="1.5" fill="white" className="drop-shadow-sm"/>
+                <circle cx="20" cy="15" r="1.5" fill="white" className="drop-shadow-sm"/>
+                <circle cx="28" cy="16" r="1.5" fill="white" className="drop-shadow-sm"/>
+                
+                {/* Letter M overlay */}
+                <path d="M14 26 L14 18 L17 22 L20 18 L20 26 M23 26 L23 18 L26 26" 
+                      stroke="white" 
+                      strokeWidth="1.5" 
+                      fill="none" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      opacity="0.9"/>
+              </svg>
             </div>
-            <span className="text-xl font-bold text-gray-900">MarketPulse</span>
+            <div>
+              <span className="text-xl font-bold text-gray-900">MarketPulse</span>
+              <div className="text-xs text-green-600 font-semibold -mt-1">Financial Intelligence</div>
+            </div>
           </div>
 
           {/* Desktop Navigation */}
@@ -58,7 +121,7 @@ function Navigation() {
             <NavLink
               to="/"
               className={({ isActive }) =>
-                `font-medium text-sm transition-colors ${
+                `font-medium text-sm transition-fast ${
                   isActive ? 'text-green-600' : 'text-gray-600 hover:text-gray-900'
                 }`
               }
@@ -70,7 +133,7 @@ function Navigation() {
             <NavLink
               to="/intelligence"
               className={({ isActive }) =>
-                `font-medium text-sm transition-colors ${
+                `font-medium text-sm transition-fast ${
                   isActive ? 'text-green-600' : 'text-gray-600 hover:text-gray-900'
                 }`
               }
@@ -85,7 +148,7 @@ function Navigation() {
             <NavLink
               to="/analytics"
               className={({ isActive }) =>
-                `font-medium text-sm transition-colors ${
+                `font-medium text-sm transition-fast ${
                   isActive ? 'text-green-600' : 'text-gray-600 hover:text-gray-900'
                 }`
               }
@@ -100,7 +163,7 @@ function Navigation() {
             <NavLink
               to="/news"
               className={({ isActive }) =>
-                `font-medium text-sm transition-colors ${
+                `font-medium text-sm transition-fast ${
                   isActive ? 'text-green-600' : 'text-gray-600 hover:text-gray-900'
                 }`
               }
@@ -108,6 +171,21 @@ function Navigation() {
               News
               <span className="ml-1 bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full text-xs font-semibold">
                 AI
+              </span>
+            </NavLink>
+
+            {/* Global Updates */}
+            <NavLink
+              to="/global-updates"
+              className={({ isActive }) =>
+                `font-medium text-sm transition-fast ${
+                  isActive ? 'text-green-600' : 'text-gray-600 hover:text-gray-900'
+                }`
+              }
+            >
+              Global Updates
+              <span className="ml-1 bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-xs font-semibold">
+                🌍
               </span>
             </NavLink>
 
@@ -140,23 +218,36 @@ function Navigation() {
                     </div>
                   ) : searchResults.length > 0 ? (
                     searchResults.map((result, idx) => (
-                      <button
+                      <div
                         key={idx}
-                        onClick={() => selectStock(result)}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                        className="flex items-center px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-gray-900">{result.symbol}</div>
-                            <div className="text-sm text-gray-600">{result.name}</div>
+                        <button
+                          onClick={() => selectStock(result)}
+                          className="flex-1 text-left btn-hover"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-semibold text-gray-900">{result.symbol}</div>
+                              <div className="text-sm text-gray-600">{result.name}</div>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              result.type === 'stock' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              {result.type?.toUpperCase()}
+                            </span>
                           </div>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            result.type === 'stock' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            {result.type?.toUpperCase()}
-                          </span>
-                        </div>
-                      </button>
+                        </button>
+                        <button
+                          onClick={(e) => addStockToDashboard(result, e)}
+                          className="ml-3 p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-fast btn-hover"
+                          title="Add to dashboard"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div className="p-4 text-center text-gray-500">No results found</div>
@@ -169,7 +260,7 @@ function Navigation() {
           {/* Status and Mobile Menu Button */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-green-600">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full pulse-soft"></div>
               <span className="text-sm font-semibold hidden sm:inline">Live</span>
             </div>
             
@@ -259,6 +350,24 @@ function Navigation() {
                 </span>
               </NavLink>
 
+              {/* Global Updates - Mobile */}
+              <NavLink
+                to="/global-updates"
+                onClick={closeMobileMenu}
+                className={({ isActive }) =>
+                  `text-left px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                    isActive
+                      ? 'text-green-600 bg-green-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`
+                }
+              >
+                Global Updates
+                <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-xs font-semibold">
+                  🌍
+                </span>
+              </NavLink>
+
             </div>
           </div>
         )}
@@ -269,9 +378,12 @@ function Navigation() {
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navigation />
-      <Outlet />
+      <main className="flex-1">
+        <Outlet />
+      </main>
+      <Footer />
     </div>
   );
 }

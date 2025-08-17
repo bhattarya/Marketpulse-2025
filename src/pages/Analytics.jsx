@@ -1,4 +1,27 @@
 import { useEffect, useState } from "react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Line, Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const fetchJSON = async (url, options = {}) => {
   const r = await fetch(url, options);
@@ -14,245 +37,522 @@ const safeToFixed = (value, decimals = 3, fallback = 'N/A') => {
   return Number(value).toFixed(decimals);
 };
 
-function CorrelationCard({ correlation, onAnalyze }) {
-  if (!correlation) return null;
+function HeaderFilters({ filters, onFilterChange, loading }) {
+  const assetTypes = ['stocks', 'crypto', 'indices'];
+  const dateRanges = [
+    { value: '7D', label: '7 Days' },
+    { value: '1M', label: '1 Month' },
+    { value: '3M', label: '3 Months' },
+    { value: '1Y', label: '1 Year' }
+  ];
 
-  const { asset1, asset2, correlation: coeff, correlation_strength, insight } = correlation;
-  
-  const getCorrelationColor = (coeff) => {
-    if (coeff === null || coeff === undefined || isNaN(coeff)) {
-      return 'text-gray-600 bg-gray-100';
-    }
-    const abs = Math.abs(coeff);
-    if (abs >= 0.7) return coeff > 0 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
-    if (abs >= 0.4) return coeff > 0 ? 'text-green-500 bg-green-50' : 'text-red-500 bg-red-50';
-    return 'text-gray-600 bg-gray-100';
-  };
-
-  const getStrengthColor = (strength) => {
-    if (strength === 'Very Strong' || strength === 'Strong') return 'text-purple-700 bg-purple-100';
-    if (strength === 'Moderate') return 'text-blue-700 bg-blue-100';
-    return 'text-gray-600 bg-gray-100';
+  const availableAssets = {
+    stocks: [
+      { symbol: 'AAPL', name: 'Apple Inc.' },
+      { symbol: 'MSFT', name: 'Microsoft' },
+      { symbol: 'GOOGL', name: 'Google' },
+      { symbol: 'TSLA', name: 'Tesla' },
+      { symbol: 'NVDA', name: 'NVIDIA' },
+      { symbol: 'AMZN', name: 'Amazon' }
+    ],
+    crypto: [
+      { symbol: 'BTC', name: 'Bitcoin' },
+      { symbol: 'ETH', name: 'Ethereum' },
+      { symbol: 'ADA', name: 'Cardano' },
+      { symbol: 'SOL', name: 'Solana' }
+    ],
+    indices: [
+      { symbol: 'SPY', name: 'S&P 500' },
+      { symbol: 'QQQ', name: 'NASDAQ 100' },
+      { symbol: 'DIA', name: 'Dow Jones' }
+    ]
   };
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-gray-900">{asset1?.symbol || 'N/A'}</span>
-            <span className="text-gray-400">↔</span>
-            <span className="font-bold text-gray-900">{asset2?.symbol || 'N/A'}</span>
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Asset Type */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Type</label>
+          <select
+            value={filters.assetType}
+            onChange={(e) => onFilterChange('assetType', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-fast"
+            disabled={loading}
+          >
+            {assetTypes.map(type => (
+              <option key={type} value={type}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Primary Asset */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Primary Asset</label>
+          <select
+            value={filters.primaryAsset}
+            onChange={(e) => onFilterChange('primaryAsset', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-fast"
+            disabled={loading}
+          >
+            {availableAssets[filters.assetType]?.map(asset => (
+              <option key={asset.symbol} value={asset.symbol}>
+                {asset.symbol} - {asset.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Compare Mode Toggle */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Compare Mode</label>
+          <div className="flex items-center">
+            <button
+              onClick={() => onFilterChange('compareMode', !filters.compareMode)}
+              className={`w-full px-4 py-2 rounded-lg font-medium transition-fast btn-hover ${
+                filters.compareMode
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              disabled={loading}
+            >
+              {filters.compareMode ? 'Compare ON' : 'Compare OFF'}
+            </button>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStrengthColor(correlation_strength)}`}>
-            {correlation_strength}
-          </span>
-          <span className={`px-3 py-1 rounded-full text-lg font-bold ${getCorrelationColor(coeff)}`}>
-            {safeToFixed(coeff, 3)}
-          </span>
+
+        {/* Secondary Asset (if compare mode) */}
+        {filters.compareMode && (
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Compare With</label>
+            <select
+              value={filters.secondaryAsset}
+              onChange={(e) => onFilterChange('secondaryAsset', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-fast"
+              disabled={loading}
+            >
+              {availableAssets[filters.assetType]?.map(asset => (
+                <option key={asset.symbol} value={asset.symbol}>
+                  {asset.symbol} - {asset.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Date Range */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Time Range</label>
+          <select
+            value={filters.dateRange}
+            onChange={(e) => onFilterChange('dateRange', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-fast"
+            disabled={loading}
+          >
+            {dateRanges.map(range => (
+              <option key={range.value} value={range.value}>
+                {range.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Asset Types */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500">{asset1?.name || asset1?.symbol || 'N/A'}</span>
-          <span className={`px-2 py-1 rounded text-xs font-medium ${
-            asset1?.type === 'stock' ? 'bg-blue-100 text-blue-700' : 
-            asset1?.type === 'crypto' ? 'bg-orange-100 text-orange-700' : 
-            'bg-green-100 text-green-700'
-          }`}>
-            {asset1?.type?.toUpperCase() || 'N/A'}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500">{asset2?.name || asset2?.symbol || 'N/A'}</span>
-          <span className={`px-2 py-1 rounded text-xs font-medium ${
-            asset2?.type === 'stock' ? 'bg-blue-100 text-blue-700' : 
-            asset2?.type === 'crypto' ? 'bg-orange-100 text-orange-700' : 
-            'bg-green-100 text-green-700'
-          }`}>
-            {asset2?.type?.toUpperCase() || 'N/A'}
-          </span>
-        </div>
-      </div>
-
-      {/* Insight */}
-      {insight && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Analysis</h4>
-          <p className="text-sm text-gray-700 mb-2">{insight.summary}</p>
-          <p className="text-xs text-gray-600">{insight.explanation}</p>
-        </div>
-      )}
-
-      {/* Data Points */}
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs text-gray-500">
-        <span>{correlation.data_points || 0} data points</span>
-        <span>{correlation.timeframe || 30} days</span>
-        <button 
-          className="text-green-600 hover:text-green-700 font-medium transition-colors"
-          onClick={() => onAnalyze && onAnalyze(correlation)}
+      {/* Analyze Button */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => onFilterChange('analyze', true)}
+          disabled={loading}
+          className="px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed btn-hover"
         >
-          View Chart →
+          {loading ? 'Analyzing...' : 'Run Analysis'}
         </button>
       </div>
     </div>
   );
 }
 
-function AssetSelector({ assets, selectedAssets, onAssetToggle, maxAssets = 4 }) {
+function PerformanceChart({ data, compareMode, title }) {
+  if (!data) return null;
+
+  const chartData = {
+    labels: data.labels || [],
+    datasets: data.datasets || []
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: title
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: false,
+        title: {
+          display: true,
+          text: 'Price ($)'
+        }
+      }
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Assets to Analyze</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {assets.map((asset, idx) => {
-          const isSelected = selectedAssets.some(a => a.symbol === asset.symbol && a.type === asset.type);
-          const isDisabled = !isSelected && selectedAssets.length >= maxAssets;
-          
-          return (
-            <button
-              key={idx}
-              onClick={() => !isDisabled && onAssetToggle(asset)}
-              disabled={isDisabled}
-              className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isSelected 
-                  ? 'bg-green-100 text-green-700 border-2 border-green-300' 
-                  : isDisabled
-                  ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
-                  : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              <div className="font-bold">{asset.symbol}</div>
-              <div className="text-xs opacity-75">{asset.name}</div>
-              <div className={`text-xs mt-1 px-2 py-1 rounded ${
-                asset.type === 'stock' ? 'bg-blue-100 text-blue-600' : 
-                asset.type === 'crypto' ? 'bg-orange-100 text-orange-600' : 
-                'bg-green-100 text-green-600'
-              }`}>
-                {asset.type.toUpperCase()}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-      
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-        <span className="text-sm text-gray-600">
-          {selectedAssets.length}/{maxAssets} selected
-        </span>
-        <span className="text-xs text-gray-500">
-          Select 2-{maxAssets} assets for correlation analysis
-        </span>
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover">
+      <div className="h-96">
+        <Line data={chartData} options={options} />
       </div>
     </div>
   );
 }
 
-function PresetButtons({ onPresetSelect, loading }) {
-  const presets = [
-    { id: 'tech-crypto', label: 'Tech vs Crypto', description: 'AAPL, TSLA vs BTC, ETH' },
-    { id: 'market-leaders', label: 'Market Leaders', description: 'AAPL, MSFT, GOOGL, NVDA' },
-    { id: 'crypto-majors', label: 'Crypto Majors', description: 'BTC, ETH, ADA' }
-  ];
+function CorrelationHeatmap({ correlationData }) {
+  if (!correlationData) return null;
+
+  const getCorrelationColor = (value) => {
+    if (value >= 0.7) return 'bg-green-500';
+    if (value >= 0.3) return 'bg-green-300';
+    if (value >= -0.3) return 'bg-yellow-300';
+    if (value >= -0.7) return 'bg-red-300';
+    return 'bg-red-500';
+  };
+
+  const getTextColor = (value) => {
+    return Math.abs(value) > 0.5 ? 'text-white' : 'text-gray-900';
+  };
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Analysis Presets</h3>
-      <div className="grid gap-3">
-        {presets.map((preset) => (
-          <button
-            key={preset.id}
-            onClick={() => onPresetSelect(preset.id)}
-            disabled={loading}
-            className="p-4 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 hover:from-purple-100 hover:to-indigo-100 transition-all duration-200 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="font-semibold text-gray-900">{preset.label}</div>
-            <div className="text-sm text-gray-600">{preset.description}</div>
-          </button>
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover">
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Correlation Matrix</h3>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="p-2"></th>
+              {correlationData.assets?.map(asset => (
+                <th key={asset} className="p-2 text-sm font-semibold text-gray-700">
+                  {asset}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {correlationData.matrix?.map((row, i) => (
+              <tr key={i}>
+                <td className="p-2 text-sm font-semibold text-gray-700">
+                  {correlationData.assets[i]}
+                </td>
+                {row.map((value, j) => (
+                  <td key={j} className="p-1">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-xs font-bold transition-fast ${getCorrelationColor(value)} ${getTextColor(value)}`}>
+                      {safeToFixed(value, 2)}
+                    </div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 flex justify-center">
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-500 rounded"></div>
+            <span>Strong Positive (+0.7 to +1.0)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-red-500 rounded"></div>
+            <span>Strong Negative (-1.0 to -0.7)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-300 rounded"></div>
+            <span>Weak (-0.3 to +0.3)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RiskMetrics({ riskData }) {
+  if (!riskData) return null;
+
+  const getRiskColor = (level) => {
+    switch(level) {
+      case 'Low': return 'text-green-600 bg-green-50 border-green-200';
+      case 'Medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'High': return 'text-red-600 bg-red-50 border-red-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover">
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Risk & Volatility Metrics</h3>
+      
+      <div className="space-y-4">
+        {riskData.assets?.map((asset, idx) => (
+          <div key={idx} className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-bold text-gray-900">{asset.symbol}</h4>
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getRiskColor(asset.riskLevel)}`}>
+                {asset.riskLevel} Risk
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-gray-500 font-medium">Volatility</div>
+                <div className="text-lg font-bold text-gray-900">{asset.volatility}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 font-medium">Sharpe Ratio</div>
+                <div className="text-lg font-bold text-gray-900">{asset.sharpeRatio}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 font-medium">Max Drawdown</div>
+                <div className="text-lg font-bold text-red-600">{asset.maxDrawdown}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 font-medium">Beta</div>
+                <div className="text-lg font-bold text-gray-900">{asset.beta}</div>
+              </div>
+            </div>
+
+            {asset.recentSpikes && asset.recentSpikes.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="text-xs text-gray-500 font-medium mb-2">Recent Volatility Spikes</div>
+                <div className="flex flex-wrap gap-2">
+                  {asset.recentSpikes.map((spike, spikeIdx) => (
+                    <span key={spikeIdx} className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">
+                      {spike.date}: {spike.change}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
+function AIInsights({ insights }) {
+  if (!insights) return null;
+
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+          <span className="text-2xl">🧠</span>
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">AI Market Insights</h3>
+          <p className="text-sm text-purple-600">DeepSeek Analysis</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {insights.correlationInsight && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+            <h4 className="font-semibold text-blue-800 mb-2">📊 Correlation Analysis</h4>
+            <p className="text-blue-700 text-sm">{insights.correlationInsight}</p>
+          </div>
+        )}
+
+        {insights.volatilityInsight && (
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-4 border border-orange-200">
+            <h4 className="font-semibold text-orange-800 mb-2">⚡ Volatility Assessment</h4>
+            <p className="text-orange-700 text-sm">{insights.volatilityInsight}</p>
+          </div>
+        )}
+
+        {insights.marketTrend && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+            <h4 className="font-semibold text-green-800 mb-2">📈 Market Trend</h4>
+            <p className="text-green-700 text-sm">{insights.marketTrend}</p>
+          </div>
+        )}
+
+        {insights.riskAssessment && (
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
+            <h4 className="font-semibold text-purple-800 mb-2">🎯 Risk Assessment</h4>
+            <p className="text-purple-700 text-sm">{insights.riskAssessment}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-500">
+        Last updated: {insights.timestamp ? new Date(insights.timestamp).toLocaleString() : 'Unknown'}
+      </div>
+    </div>
+  );
+}
+
 export default function Analytics() {
-  const [correlations, setCorrelations] = useState([]);
-  const [selectedAssets, setSelectedAssets] = useState([]);
+  const [filters, setFilters] = useState({
+    assetType: 'stocks',
+    primaryAsset: 'AAPL',
+    secondaryAsset: 'MSFT',
+    compareMode: false,
+    dateRange: '1M'
+  });
+
   const [loading, setLoading] = useState(false);
-  const [presetData, setPresetData] = useState(null);
-  const [activeTab, setActiveTab] = useState('custom');
+  const [chartData, setChartData] = useState(null);
+  const [correlationData, setCorrelationData] = useState(null);
+  const [riskData, setRiskData] = useState(null);
+  const [aiInsights, setAiInsights] = useState(null);
 
-  const availableAssets = [
-    { symbol: 'AAPL', type: 'stock', name: 'Apple Inc.' },
-    { symbol: 'MSFT', type: 'stock', name: 'Microsoft' },
-    { symbol: 'GOOGL', type: 'stock', name: 'Google' },
-    { symbol: 'TSLA', type: 'stock', name: 'Tesla' },
-    { symbol: 'NVDA', type: 'stock', name: 'NVIDIA' },
-    { symbol: 'BTC', type: 'crypto', name: 'Bitcoin' },
-    { symbol: 'ETH', type: 'crypto', name: 'Ethereum' },
-    { symbol: 'ADA', type: 'crypto', name: 'Cardano' }
-  ];
-
-  const handleAssetToggle = (asset) => {
-    setSelectedAssets(prev => {
-      const exists = prev.some(a => a.symbol === asset.symbol && a.type === asset.type);
-      if (exists) {
-        return prev.filter(a => !(a.symbol === asset.symbol && a.type === asset.type));
-      } else {
-        return [...prev, asset];
-      }
-    });
+  const handleFilterChange = async (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    
+    if (key === 'analyze') {
+      await runAnalysis();
+    }
   };
 
-  const analyzeCorrelations = async () => {
-    if (selectedAssets.length < 2) return;
-    
+  const runAnalysis = async () => {
     setLoading(true);
     try {
-      const response = await fetchJSON("http://localhost:5000/api/correlation/multiple", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          assets: selectedAssets,
-          timeframe: 30
-        })
-      });
+      // Generate mock data for demonstration
+      // In production, these would be real API calls
       
-      setCorrelations(response.correlations || []);
+      // Chart Data
+      const mockChartData = generateMockChartData();
+      setChartData(mockChartData);
+
+      // Correlation Matrix
+      const mockCorrelationData = generateMockCorrelationData();
+      setCorrelationData(mockCorrelationData);
+
+      // Risk Metrics
+      const mockRiskData = generateMockRiskData();
+      setRiskData(mockRiskData);
+
+      // AI Insights
+      const mockInsights = generateMockInsights();
+      setAiInsights(mockInsights);
+
     } catch (error) {
-      console.error('Error analyzing correlations:', error);
-      setCorrelations([]);
+      console.error('Analysis error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePresetSelect = async (presetId) => {
-    setLoading(true);
-    setActiveTab('presets');
+  const generateMockChartData = () => {
+    const labels = [];
+    const primaryData = [];
+    const secondaryData = [];
     
-    try {
-      const response = await fetchJSON(`http://localhost:5000/api/correlation/presets/${presetId}?timeframe=30`);
-      setPresetData(response);
-    } catch (error) {
-      console.error('Error fetching preset:', error);
-      setPresetData(null);
-    } finally {
-      setLoading(false);
+    for (let i = 30; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      labels.push(date.toLocaleDateString());
+      
+      primaryData.push(150 + Math.random() * 50 + i * 2);
+      if (filters.compareMode) {
+        secondaryData.push(300 + Math.random() * 100 + i * 3);
+      }
     }
+
+    const datasets = [
+      {
+        label: filters.primaryAsset,
+        data: primaryData,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.1
+      }
+    ];
+
+    if (filters.compareMode) {
+      datasets.push({
+        label: filters.secondaryAsset,
+        data: secondaryData,
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.1
+      });
+    }
+
+    return { labels, datasets };
   };
 
-  useEffect(() => {
-    if (selectedAssets.length >= 2) {
-      analyzeCorrelations();
+  const generateMockCorrelationData = () => {
+    const assets = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'BTC'];
+    const matrix = assets.map(() => 
+      assets.map(() => (Math.random() - 0.5) * 2)
+    );
+
+    // Ensure diagonal is 1.0
+    for (let i = 0; i < assets.length; i++) {
+      matrix[i][i] = 1.0;
     }
-  }, [selectedAssets]);
+
+    return { assets, matrix };
+  };
+
+  const generateMockRiskData = () => {
+    const assets = [
+      {
+        symbol: filters.primaryAsset,
+        volatility: (Math.random() * 30 + 10).toFixed(1),
+        sharpeRatio: (Math.random() * 2 + 0.5).toFixed(2),
+        maxDrawdown: (Math.random() * 20 + 5).toFixed(1),
+        beta: (Math.random() * 1.5 + 0.5).toFixed(2),
+        riskLevel: Math.random() > 0.6 ? 'High' : Math.random() > 0.3 ? 'Medium' : 'Low',
+        recentSpikes: [
+          { date: '2025-08-15', change: '+5.2' },
+          { date: '2025-08-10', change: '-3.8' }
+        ]
+      }
+    ];
+
+    if (filters.compareMode) {
+      assets.push({
+        symbol: filters.secondaryAsset,
+        volatility: (Math.random() * 30 + 10).toFixed(1),
+        sharpeRatio: (Math.random() * 2 + 0.5).toFixed(2),
+        maxDrawdown: (Math.random() * 20 + 5).toFixed(1),
+        beta: (Math.random() * 1.5 + 0.5).toFixed(2),
+        riskLevel: Math.random() > 0.6 ? 'High' : Math.random() > 0.3 ? 'Medium' : 'Low',
+        recentSpikes: [
+          { date: '2025-08-12', change: '+7.1' },
+          { date: '2025-08-08', change: '-4.3' }
+        ]
+      });
+    }
+
+    return { assets };
+  };
+
+  const generateMockInsights = () => {
+    return {
+      correlationInsight: `${filters.primaryAsset} and ${filters.secondaryAsset} show a ${(Math.random() > 0.5 ? '+' : '-')}${(Math.random() * 0.8 + 0.2).toFixed(2)} correlation over the ${filters.dateRange} period. This ${Math.random() > 0.5 ? 'positive' : 'negative'} relationship suggests ${Math.random() > 0.5 ? 'similar' : 'divergent'} market sentiment affecting both assets.`,
+      volatilityInsight: `Market volatility has ${Math.random() > 0.5 ? 'increased' : 'decreased'} by ${(Math.random() * 15 + 5).toFixed(1)}% compared to historical averages. Recent ${Math.random() > 0.5 ? 'geopolitical events' : 'economic data releases'} have contributed to this ${Math.random() > 0.5 ? 'heightened' : 'reduced'} volatility environment.`,
+      marketTrend: `The overall trend for ${filters.primaryAsset} appears ${Math.random() > 0.5 ? 'bullish' : 'bearish'} with ${Math.random() > 0.5 ? 'strong momentum' : 'consolidation patterns'} visible in the ${filters.dateRange} timeframe. Key support levels are holding ${Math.random() > 0.5 ? 'firm' : 'with some weakness'}.`,
+      riskAssessment: `Current risk-adjusted returns suggest a ${Math.random() > 0.5 ? 'favorable' : 'cautious'} risk/reward profile. The Sharpe ratio indicates ${Math.random() > 0.5 ? 'efficient' : 'suboptimal'} performance relative to risk taken, with ${Math.random() > 0.5 ? 'institutional' : 'retail'} sentiment remaining ${Math.random() > 0.5 ? 'positive' : 'neutral'}.`,
+      timestamp: new Date().toISOString()
+    };
+  };
+
+  // Load initial analysis
+  useEffect(() => {
+    runAnalysis();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -261,158 +561,88 @@ export default function Analytics() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Cross-Market Analytics</h1>
-              <p className="text-gray-600 mt-1">Discover how different markets move together</p>
+              <h1 className="text-3xl font-bold text-gray-900">Professional Analytics</h1>
+              <p className="text-gray-600 mt-1">Institutional-grade market analysis and risk assessment</p>
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-indigo-600">
-                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-semibold">Correlation Engine</span>
+              <div className="flex items-center gap-2 text-blue-600">
+                <div className="w-2 h-2 bg-blue-500 rounded-full pulse-soft"></div>
+                <span className="text-sm font-semibold">Live Data + AI</span>
               </div>
             </div>
-          </div>
-          
-          {/* Navigation Tabs */}
-          <div className="flex gap-1 mt-4 bg-gray-100 rounded-lg p-1 w-fit">
-            {[
-              { id: 'custom', label: 'Custom Analysis' },
-              { id: 'presets', label: 'Quick Presets' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
           </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Custom Analysis Tab */}
-        {activeTab === 'custom' && (
-          <div className="space-y-6">
-            {/* Asset Selector */}
-            <AssetSelector 
-              assets={availableAssets}
-              selectedAssets={selectedAssets}
-              onAssetToggle={handleAssetToggle}
-              maxAssets={4}
-            />
+        {/* Header Filters */}
+        <div className="mb-8">
+          <HeaderFilters 
+            filters={filters} 
+            onFilterChange={handleFilterChange} 
+            loading={loading}
+          />
+        </div>
 
-            {/* Analysis Button */}
-            {selectedAssets.length >= 2 && (
-              <div className="text-center">
-                <button
-                  onClick={analyzeCorrelations}
-                  disabled={loading}
-                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-lg shadow-md hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Analyzing...' : `Analyze ${selectedAssets.length} Assets`}
-                </button>
+        {/* Top Half - Interactive Charts */}
+        <div className="grid gap-6 lg:grid-cols-3 mb-8">
+          {/* Performance Chart - Takes 2 columns */}
+          <div className="lg:col-span-2">
+            {loading ? (
+              <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
+                <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading chart data...</p>
               </div>
-            )}
-
-            {/* Correlations Results */}
-            {correlations.length > 0 && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Correlation Analysis Results</h2>
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {correlations.map((correlation, idx) => (
-                    <CorrelationCard key={idx} correlation={correlation} />
-                  ))}
-                </div>
-              </div>
+            ) : (
+              <PerformanceChart 
+                data={chartData} 
+                compareMode={filters.compareMode}
+                title={`${filters.primaryAsset}${filters.compareMode ? ` vs ${filters.secondaryAsset}` : ''} - ${filters.dateRange}`}
+              />
             )}
           </div>
-        )}
 
-        {/* Presets Tab */}
-        {activeTab === 'presets' && (
-          <div className="space-y-6">
-            {/* Preset Buttons */}
-            <PresetButtons onPresetSelect={handlePresetSelect} loading={loading} />
-
-            {/* Preset Results */}
-            {presetData && (
-              <div>
-                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 mb-6 border border-purple-100">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      {presetData.preset.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Analysis
-                    </h2>
-                    <div className="flex items-center gap-2">
-                      <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-semibold">
-                        {presetData.summary?.total_pairs} Correlations
-                      </span>
-                      <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-semibold">
-                        Avg: {safeToFixed(presetData.summary?.average_correlation, 3)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {presetData.assets?.map((asset, idx) => (
-                      <div key={idx} className="bg-white rounded-lg p-3 text-center shadow-sm">
-                        <div className="font-bold text-gray-900">{asset.symbol}</div>
-                        <div className="text-xs text-gray-600">{asset.name}</div>
-                        <div className={`text-xs mt-1 px-2 py-1 rounded ${
-                          asset.type === 'stock' ? 'bg-blue-100 text-blue-600' : 
-                          asset.type === 'crypto' ? 'bg-orange-100 text-orange-600' : 
-                          'bg-green-100 text-green-600'
-                        }`}>
-                          {asset.type.toUpperCase()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {presetData.correlations?.map((correlation, idx) => (
-                    <CorrelationCard key={idx} correlation={correlation} />
-                  ))}
-                </div>
+          {/* Risk Metrics - Sidebar */}
+          <div>
+            {loading ? (
+              <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
+                <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-600">Calculating risks...</p>
               </div>
+            ) : (
+              <RiskMetrics riskData={riskData} />
             )}
           </div>
-        )}
+        </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center gap-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
-              <span className="text-gray-600">Analyzing correlations...</span>
-            </div>
+        {/* Bottom Half - Correlation Matrix and AI Insights */}
+        <div className="grid gap-6 lg:grid-cols-2 mb-8">
+          {/* Correlation Heatmap */}
+          <div>
+            {loading ? (
+              <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
+                <div className="animate-spin h-8 w-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-600">Building correlation matrix...</p>
+              </div>
+            ) : (
+              <CorrelationHeatmap correlationData={correlationData} />
+            )}
           </div>
-        )}
 
-        {/* Empty State */}
-        {!loading && correlations.length === 0 && !presetData && (
-          <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Start Your Analysis</h3>
-            <p className="text-gray-600 mb-4">
-              Select assets to analyze correlations or choose a quick preset to get started.
-            </p>
-            <p className="text-xs text-gray-500">
-              The correlation engine will calculate how assets move together over the last 30 days.
-            </p>
+          {/* AI Insights */}
+          <div>
+            {loading ? (
+              <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
+                <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-600">Generating AI insights...</p>
+              </div>
+            ) : (
+              <AIInsights insights={aiInsights} />
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -869,6 +869,173 @@ app.get("/api/correlation/presets/:preset", async (req, res) => {
   }
 });
 
+// === FED MEETING TRACKER ===
+app.get("/api/intelligence/fed-tracker", async (req, res) => {
+  try {
+    const cacheKey = 'fed_tracker';
+    const cached = newsCache[cacheKey];
+    const now = Date.now();
+    
+    if (cached && now - newsCacheTime[cacheKey] < 3600000) { // 1 hour cache
+      return res.json(cached);
+    }
+
+    if (!openai) {
+      throw new Error("OpenAI API key not configured");
+    }
+
+    const prompt = `Generate detailed Federal Reserve meeting information for the last 3 meetings and upcoming meeting. Include:
+
+1. Next scheduled FED meeting date (estimate based on typical 8 meetings per year)
+2. Last 3 meetings with key decisions and discussions
+3. Interest rate decisions and reasoning
+4. Economic outlook discussions
+5. Market impact assessments
+
+Format as JSON:
+{
+  "nextMeeting": {
+    "date": "2025-XX-XX",
+    "type": "FOMC Meeting",
+    "expectedTopics": ["topic1", "topic2", "topic3"]
+  },
+  "recentMeetings": [
+    {
+      "date": "2024-XX-XX",
+      "decision": "Rate decision description",
+      "keyDiscussions": ["discussion1", "discussion2"],
+      "marketImpact": "impact description",
+      "rateChange": "0.25% increase/decrease/hold"
+    }
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2
+    });
+
+    let fedData = {};
+    try {
+      fedData = JSON.parse(completion.choices[0].message.content);
+    } catch (parseError) {
+      console.error("Failed to parse FED data:", parseError);
+      fedData = {
+        nextMeeting: {
+          date: "2025-03-15",
+          type: "FOMC Meeting",
+          expectedTopics: ["Interest rates", "Economic outlook", "Inflation targets"]
+        },
+        recentMeetings: [
+          {
+            date: "2024-12-18",
+            decision: "Rate cut by 0.25%",
+            keyDiscussions: ["Economic stability", "Labor market"],
+            marketImpact: "Positive market reaction",
+            rateChange: "0.25% decrease"
+          }
+        ]
+      };
+    }
+
+    newsCache[cacheKey] = fedData;
+    newsCacheTime[cacheKey] = now;
+    res.json(fedData);
+  } catch (error) {
+    console.error("FED Tracker API Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch FED data" });
+  }
+});
+
+// === ECONOMIC INDICATORS API ===
+app.get("/api/intelligence/economic-indicators", async (req, res) => {
+  try {
+    const cacheKey = 'economic_indicators';
+    const cached = newsCache[cacheKey];
+    const now = Date.now();
+    
+    if (cached && now - newsCacheTime[cacheKey] < 1800000) { // 30 min cache
+      return res.json(cached);
+    }
+
+    if (!genAI) {
+      throw new Error("Gemini API key not configured");
+    }
+
+    const prompt = `Provide current real-time economic indicators data for ${new Date().toDateString()}:
+
+1. Current mortgage rates (nationwide average)
+2. Oil prices (WTI and Brent crude)
+3. Inflation rate (latest CPI data)
+4. Brief analysis of each indicator's trend and market impact
+
+Format as JSON only, no markdown:
+{
+  "mortgageRates": {
+    "thirtyYear": "6.75%",
+    "fifteenYear": "6.25%",
+    "trend": "rising/falling/stable",
+    "impact": "brief impact description"
+  },
+  "oilPrices": {
+    "wti": "$75.50",
+    "brent": "$78.20",
+    "trend": "rising/falling/stable",
+    "impact": "brief impact description"
+  },
+  "inflation": {
+    "rate": "3.2%",
+    "trend": "rising/falling/stable",
+    "impact": "brief impact description",
+    "target": "2.0%"
+  },
+  "lastUpdated": "${new Date().toISOString()}"
+}`;
+
+    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL });
+    const result = await model.generateContent(prompt);
+
+    let indicators = {};
+    try {
+      const responseText = result.response.text();
+      // Clean any markdown formatting
+      const cleanText = responseText.replace(/```json\n?|```\n?/g, '').trim();
+      indicators = JSON.parse(cleanText);
+    } catch (parseError) {
+      console.error("Failed to parse economic indicators:", parseError);
+      indicators = {
+        mortgageRates: {
+          thirtyYear: "6.75%",
+          fifteenYear: "6.25%",
+          trend: "stable",
+          impact: "Elevated rates continue to impact housing market"
+        },
+        oilPrices: {
+          wti: "$75.50",
+          brent: "$78.20",
+          trend: "stable",
+          impact: "Oil prices affecting inflation and transportation costs"
+        },
+        inflation: {
+          rate: "3.2%",
+          trend: "falling",
+          impact: "Above target but showing improvement",
+          target: "2.0%"
+        },
+        lastUpdated: new Date().toISOString().split('T')[0]
+      };
+    }
+
+    newsCache[cacheKey] = indicators;
+    newsCacheTime[cacheKey] = now;
+    res.json(indicators);
+  } catch (error) {
+    console.error("Economic Indicators API Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch economic indicators" });
+  }
+});
+
 // === INTELLIGENCE PAGE - BIG TECH BOARD NEWS ===
 app.get("/api/intelligence/tech-board", async (req, res) => {
   try {
@@ -960,6 +1127,66 @@ Respond in JSON format:
   }
 });
 
+// === MARKET METRICS API ===
+app.get("/api/market-metrics", async (req, res) => {
+  try {
+    const cacheKey = 'market_metrics';
+    const cached = newsCache[cacheKey];
+    const now = Date.now();
+    
+    if (cached && now - newsCacheTime[cacheKey] < 300000) { // 5 min cache
+      return res.json(cached);
+    }
+
+    const metrics = {};
+
+    // Get Fear & Greed Index
+    try {
+      const fgResponse = await axios.get("https://api.alternative.me/fng/");
+      metrics.fearGreed = fgResponse.data?.data?.[0] || null;
+    } catch (error) {
+      console.warn("Fear & Greed API failed");
+      metrics.fearGreed = null;
+    }
+
+    // Get Global Market Cap from CoinGecko
+    try {
+      const globalResponse = await axios.get(`${process.env.COINGECKO_BASE}/global`);
+      const globalData = globalResponse.data?.data;
+      if (globalData) {
+        metrics.totalMarketCap = globalData.total_market_cap?.usd || null;
+        metrics.total24hVolume = globalData.total_volume?.usd || null;
+        metrics.marketCapChange24h = globalData.market_cap_change_percentage_24h_usd || null;
+      }
+    } catch (error) {
+      console.warn("CoinGecko global data failed");
+    }
+
+    // Get additional stock market data
+    try {
+      const spyResponse = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/SPY`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      });
+      
+      if (spyResponse.data?.chart?.result?.[0]) {
+        const spyData = spyResponse.data.chart.result[0];
+        const quote = spyData.meta;
+        metrics.spyPrice = quote.regularMarketPrice;
+        metrics.spyChange = ((quote.regularMarketPrice - quote.previousClose) / quote.previousClose) * 100;
+      }
+    } catch (error) {
+      console.warn("SPY data failed");
+    }
+
+    newsCache[cacheKey] = metrics;
+    newsCacheTime[cacheKey] = now;
+    res.json(metrics);
+  } catch (error) {
+    console.error("Market Metrics API Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch market metrics" });
+  }
+});
+
 // === GLOBAL TARIFF TRACKER ===
 app.get("/api/intelligence/tariffs", async (req, res) => {
   try {
@@ -1030,6 +1257,438 @@ Keep response concise and factual. Format as JSON:
   } catch (error) {
     console.error("Global Tariffs API Error:", error.message);
     res.status(500).json({ error: "Failed to fetch tariff data" });
+  }
+});
+
+// === GLOBAL NEWS BY COUNTRY API ===
+app.get("/api/news/global", async (req, res) => {
+  try {
+    const { country } = req.query;
+    
+    if (!country) {
+      return res.status(400).json({ error: "Country parameter is required" });
+    }
+
+    const cacheKey = `global_news_${country}`;
+    const now = Date.now();
+    const cacheTimeout = 30 * 60 * 1000; // 30 minutes
+
+    // Check cache
+    if (newsCache[cacheKey] && (now - newsCacheTime[cacheKey]) < cacheTimeout) {
+      return res.json(newsCache[cacheKey]);
+    }
+
+    let articles = [];
+
+    // Try NewsData.io API first for global news
+    if (process.env.NEWSDATA_API_KEY) {
+      try {
+        const countryCode = getCountryCode(country);
+        const response = await axios.get(
+          `https://newsdata.io/api/1/news?apikey=${process.env.NEWSDATA_API_KEY}&country=${countryCode}&category=business,politics&language=en&size=10`
+        );
+        
+        if (response.data?.results) {
+          articles = response.data.results.map(article => ({
+            title: article.title,
+            url: article.link || '#',
+            urlToImage: article.image_url,
+            source: article.source_id || 'NewsData',
+            summary: article.description || article.content || 'No summary available',
+            publishedAt: article.pubDate,
+            country: country
+          }));
+          console.log(`Found ${articles.length} articles for ${country} from NewsData.io`);
+        }
+      } catch (error) {
+        console.warn(`NewsData.io failed for ${country}:`, error.message);
+      }
+    }
+
+    // Fallback to NewsAPI if NewsData.io fails
+    if (articles.length === 0 && process.env.NEWS_API_KEY) {
+      try {
+        const countryCode = getNewsAPICountryCode(country);
+        const response = await axios.get(
+          `https://newsapi.org/v2/top-headlines?country=${countryCode}&category=business&pageSize=10&apiKey=${process.env.NEWS_API_KEY}`
+        );
+        
+        if (response.data?.articles) {
+          articles = response.data.articles.map(article => ({
+            title: article.title,
+            url: article.url || '#',
+            urlToImage: article.urlToImage,
+            source: article.source?.name || 'NewsAPI',
+            summary: article.description || 'No summary available',
+            publishedAt: article.publishedAt,
+            country: country
+          }));
+          console.log(`Found ${articles.length} articles for ${country} from NewsAPI`);
+        }
+      } catch (error) {
+        console.warn(`NewsAPI failed for ${country}:`, error.message);
+      }
+    }
+
+    // If no articles found, provide fallback content
+    if (articles.length === 0) {
+      articles = getFallbackGlobalNews(country);
+      console.log(`Using fallback news for ${country}`);
+    }
+
+    // Limit to top 8 articles
+    articles = articles.slice(0, 8);
+
+    newsCache[cacheKey] = articles;
+    newsCacheTime[cacheKey] = now;
+    res.json(articles);
+  } catch (error) {
+    console.error("Global News API Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch global news" });
+  }
+});
+
+// Helper function to get country codes for NewsData.io
+function getCountryCode(country) {
+  const countryMap = {
+    'CHINA': 'cn',
+    'INDIA': 'in', 
+    'JAPAN': 'jp',
+    'UK': 'gb',
+    'KOREA': 'kr'
+  };
+  return countryMap[country] || 'us';
+}
+
+// Helper function to get country codes for NewsAPI
+function getNewsAPICountryCode(country) {
+  const countryMap = {
+    'CHINA': 'cn',
+    'INDIA': 'in',
+    'JAPAN': 'jp', 
+    'UK': 'gb',
+    'KOREA': 'kr'
+  };
+  return countryMap[country] || 'us';
+}
+
+// Helper function for fallback global news
+function getFallbackGlobalNews(country) {
+  const fallbackNews = {
+    'CHINA': [
+      {
+        title: "China Economic Growth Indicators Show Resilient Performance",
+        url: "#",
+        urlToImage: null,
+        source: "MarketPulse Global",
+        summary: "Recent economic data from China indicates steady growth momentum in key sectors.",
+        publishedAt: new Date().toISOString(),
+        country: "CHINA"
+      },
+      {
+        title: "Chinese Technology Sector Continues Innovation Drive",
+        url: "#", 
+        urlToImage: null,
+        source: "MarketPulse Tech",
+        summary: "Technology companies in China maintain focus on innovation and global expansion.",
+        publishedAt: new Date(Date.now() - 3600000).toISOString(),
+        country: "CHINA"
+      }
+    ],
+    'INDIA': [
+      {
+        title: "India's Digital Economy Expansion Accelerates",
+        url: "#",
+        urlToImage: null,
+        source: "MarketPulse Global",
+        summary: "India continues to lead digital transformation initiatives across multiple sectors.",
+        publishedAt: new Date().toISOString(),
+        country: "INDIA"
+      }
+    ],
+    'JAPAN': [
+      {
+        title: "Japan Manufacturing Sector Shows Strong Performance",
+        url: "#",
+        urlToImage: null,
+        source: "MarketPulse Global", 
+        summary: "Japanese manufacturing maintains competitive edge through technological advancement.",
+        publishedAt: new Date().toISOString(),
+        country: "JAPAN"
+      }
+    ],
+    'UK': [
+      {
+        title: "UK Financial Services Sector Adapts to Global Changes",
+        url: "#",
+        urlToImage: null,
+        source: "MarketPulse Global",
+        summary: "London's financial district continues to innovate amid changing global dynamics.",
+        publishedAt: new Date().toISOString(),
+        country: "UK"
+      }
+    ],
+    'KOREA': [
+      {
+        title: "South Korea Technology Exports Maintain Growth Trajectory",
+        url: "#",
+        urlToImage: null,
+        source: "MarketPulse Global",
+        summary: "Korean technology exports show resilience in global markets.",
+        publishedAt: new Date().toISOString(),
+        country: "KOREA"
+      }
+    ]
+  };
+  
+  return fallbackNews[country] || [{
+    title: `${country} Market Update`,
+    url: "#",
+    urlToImage: null,
+    source: "MarketPulse Global",
+    summary: `Latest market developments from ${country}.`,
+    publishedAt: new Date().toISOString(),
+    country: country
+  }];
+}
+
+// === GEO-EVENT RISK ANALYZER API ===
+app.get("/api/intelligence/geo-events", async (req, res) => {
+  try {
+    const cacheKey = 'geo_events_analyzer';
+    const cached = newsCache[cacheKey];
+    const now = Date.now();
+    
+    if (cached && now - newsCacheTime[cacheKey] < 1800000) { // 30 min cache
+      return res.json(cached);
+    }
+
+    if (!genAI) {
+      throw new Error("Gemini API key not configured");
+    }
+
+    const regions = ['USA', 'China', 'India', 'Europe', 'Global'];
+    const geoEvents = [];
+
+    for (const region of regions) {
+      const prompt = `Analyze recent geopolitical events in ${region} that could impact financial markets:
+
+1. Identify 2-3 key events affecting ${region}
+2. Assess market impact risk level (High/Medium/Low)  
+3. Explain how this could affect US/India/Global markets
+4. Provide brief risk assessment
+
+Format as JSON only, no markdown:
+{
+  "region": "${region}",
+  "events": [
+    {
+      "title": "event title",
+      "description": "brief description",
+      "riskLevel": "High/Medium/Low",
+      "marketImpact": "specific market impact explanation",
+      "affectedSectors": ["sector1", "sector2"],
+      "timeframe": "short-term/medium-term/long-term"
+    }
+  ],
+  "overallRisk": "High/Medium/Low",
+  "lastUpdated": "${new Date().toISOString()}"
+}`;
+
+      try {
+        const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL });
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        const cleanText = responseText.replace(/```json\n?|```\n?/g, '').trim();
+        const regionData = JSON.parse(cleanText);
+        geoEvents.push(regionData);
+        
+        // Rate limiting for Gemini API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Failed to get geo events for ${region}:`, error);
+        geoEvents.push({
+          region,
+          events: [{
+            title: `${region} Market Monitoring`,
+            description: "Monitoring regional developments",
+            riskLevel: "Medium",
+            marketImpact: "General market volatility possible",
+            affectedSectors: ["General Market"],
+            timeframe: "ongoing"
+          }],
+          overallRisk: "Medium",
+          lastUpdated: new Date().toISOString()
+        });
+      }
+    }
+
+    const responseData = {
+      regions: geoEvents,
+      summary: {
+        totalEvents: geoEvents.reduce((acc, region) => acc + region.events.length, 0),
+        highRiskRegions: geoEvents.filter(r => r.overallRisk === 'High').length,
+        lastUpdated: new Date().toISOString()
+      }
+    };
+
+    newsCache[cacheKey] = responseData;
+    newsCacheTime[cacheKey] = now;
+    res.json(responseData);
+  } catch (error) {
+    console.error("Geo-Events API Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch geo-event data" });
+  }
+});
+
+// === AI CHATBOT WITH DEEPSEEK API ===
+app.post("/api/chatbot/ask", async (req, res) => {
+  try {
+    const { message, ticker } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+    if (!deepseekApiKey) {
+      throw new Error("DeepSeek API key not configured");
+    }
+
+    let systemPrompt = `You are MarketPulse AI, a financial education and analysis assistant. Provide helpful, educational, and concise financial information.
+
+For general questions: Answer with clear explanations, examples, and educational value.
+
+For stock-specific questions: Use this format EXACTLY:
+📌 Name – Full company name + ticker
+📊 Current Market Status – Positive/Negative (based on recent trends)
+📰 3 Important Headlines – Recent significant news
+📈 Market Sentiment – Positive/Neutral/Negative
+🏢 What the Company Does – Brief business description  
+📘 Learn Stock Market – Educational insight related to the query
+
+Keep responses concise and educational. Always end with "💡 Ask me anything about finance or specific stocks!"`;
+
+    if (ticker) {
+      systemPrompt += `\n\nThe user is asking about ${ticker.toUpperCase()}. Provide detailed analysis for this stock using the format above.`;
+    }
+
+    const deepseekResponse = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000
+    }, {
+      headers: {
+        'Authorization': `Bearer ${deepseekApiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const aiResponse = deepseekResponse.data.choices[0].message.content;
+
+    // If this is a stock-specific query, also fetch recent news
+    let stockNews = null;
+    if (ticker) {
+      try {
+        const newsResponse = await fetchJSON(`http://localhost:5000/api/news?ticker=${ticker}`);
+        stockNews = newsResponse.slice(0, 3);
+      } catch (error) {
+        console.warn('Failed to fetch stock news:', error);
+      }
+    }
+
+    res.json({
+      response: aiResponse,
+      ticker: ticker || null,
+      news: stockNews,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("Chatbot API Error:", error.message);
+    res.status(500).json({ 
+      error: "Failed to process your question",
+      response: "I'm sorry, I'm having trouble processing your request right now. Please try again in a moment. 💡 Ask me anything about finance or specific stocks!"
+    });
+  }
+});
+
+// === STOCK ANALYSIS CHATBOT ===
+app.post("/api/chatbot/analyze-stock", async (req, res) => {
+  try {
+    const { ticker } = req.body;
+    
+    if (!ticker) {
+      return res.status(400).json({ error: "Stock ticker is required" });
+    }
+
+    const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+    if (!deepseekApiKey) {
+      throw new Error("DeepSeek API key not configured");
+    }
+
+    // Fetch stock news first
+    let stockNews = [];
+    try {
+      const newsResponse = await fetchJSON(`http://localhost:5000/api/news?ticker=${ticker}`);
+      stockNews = newsResponse.slice(0, 3);
+    } catch (error) {
+      console.warn('Failed to fetch stock news:', error);
+    }
+
+    const headlines = stockNews.map(n => n.title).join('\n');
+
+    const prompt = `Analyze ${ticker.toUpperCase()} stock and provide information in this EXACT format:
+
+📌 Name – [Full company name + ticker]
+📊 Current Market Status – [Positive/Negative based on recent trends]
+📰 3 Important Headlines – 
+1. [Headline 1]
+2. [Headline 2] 
+3. [Headline 3]
+📈 Market Sentiment – [Positive/Neutral/Negative]
+🏢 What the Company Does – [Brief business description]
+📘 Learn Stock Market – [Educational insight about this stock or market concept]
+
+Recent headlines for context:
+${headlines}
+
+Keep each section concise and informative.`;
+
+    const deepseekResponse = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: 'You are a financial analyst providing structured stock analysis.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 800
+    }, {
+      headers: {
+        'Authorization': `Bearer ${deepseekApiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const analysis = deepseekResponse.data.choices[0].message.content;
+
+    res.json({
+      ticker: ticker.toUpperCase(),
+      analysis,
+      news: stockNews,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("Stock Analysis API Error:", error.message);
+    res.status(500).json({ 
+      error: "Failed to analyze stock",
+      analysis: `📌 Name – ${req.body.ticker?.toUpperCase() || 'Unknown'}\n📊 Current Market Status – Unable to determine\n📰 3 Important Headlines – News unavailable\n📈 Market Sentiment – Analysis unavailable\n🏢 What the Company Does – Information unavailable\n📘 Learn Stock Market – Please try again later`
+    });
   }
 });
 

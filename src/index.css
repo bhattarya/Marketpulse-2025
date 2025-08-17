@@ -25,11 +25,162 @@ body {
     overflow: hidden;
   }
   
-  /* Smooth transitions for all interactive elements */
+  /* Webull-style smooth transitions */
   .transition-all {
     transition-property: all;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition-duration: 250ms;
+  }
+  
+  .transition-fast {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
     transition-duration: 150ms;
+  }
+  
+  .transition-slow {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition-duration: 400ms;
+  }
+  
+  /* Page transition effects */
+  .page-enter {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  
+  .page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+  }
+  
+  /* Card hover effects - Webull style */
+  .card-hover {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    transition: all 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  /* Button hover effects */
+  .btn-hover {
+    transform: scale(1);
+    transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .btn-hover:hover {
+    transform: scale(1.02);
+  }
+  
+  .btn-hover:active {
+    transform: scale(0.98);
+  }
+  
+  /* Pulse animation for live indicators */
+  .pulse-soft {
+    animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-soft {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  
+  /* Slide in animations */
+  .slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+  
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  .slide-in-up {
+    animation: slide-in-up 0.4s ease-out;
+  }
+  
+  @keyframes slide-in-up {
+    from {
+      transform: translateY(30px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Fade in stagger for lists */
+  .fade-in-stagger {
+    opacity: 0;
+    animation: fade-in-stagger 0.5s ease-out forwards;
+  }
+  
+  .fade-in-stagger:nth-child(1) { animation-delay: 0.1s; }
+  .fade-in-stagger:nth-child(2) { animation-delay: 0.2s; }
+  .fade-in-stagger:nth-child(3) { animation-delay: 0.3s; }
+  .fade-in-stagger:nth-child(4) { animation-delay: 0.4s; }
+  .fade-in-stagger:nth-child(5) { animation-delay: 0.5s; }
+  .fade-in-stagger:nth-child(6) { animation-delay: 0.6s; }
+  
+  @keyframes fade-in-stagger {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Number counter animation */
+  .counter-up {
+    animation: counter-up 1.2s ease-out;
+  }
+  
+  @keyframes counter-up {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Loading shimmer effect */
+  .shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
   }
 }
 

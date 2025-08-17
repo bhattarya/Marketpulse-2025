@@ -35,11 +35,11 @@ const normalizeNews = (n) => ({
 /* ---------- Robinhood-style UI components ---------- */
 function MetricCard({ title, value, sub, trend }) {
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover fade-in-stagger">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-gray-600 text-sm font-medium">{title}</h3>
         {trend && (
-          <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
+          <div className={`px-2 py-1 rounded-full text-xs font-semibold transition-fast ${
             trend === 'up' ? 'bg-green-50 text-green-700' : 
             trend === 'down' ? 'bg-red-50 text-red-700' : 
             'bg-gray-50 text-gray-700'
@@ -48,7 +48,7 @@ function MetricCard({ title, value, sub, trend }) {
           </div>
         )}
       </div>
-      <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+      <p className="text-3xl font-bold text-gray-900 mb-1 counter-up">{value}</p>
       <p className="text-gray-500 text-sm">{sub}</p>
     </div>
   );
@@ -59,13 +59,13 @@ function AssetCard({ name, symbol, price, changePct, volume, isLarge = false }) 
   const changeColor = isUp === null ? "text-gray-600" : isUp ? "text-green-600" : "text-red-600";
   
   return (
-    <div className={`bg-white rounded-2xl p-${isLarge ? '6' : '4'} shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer`}>
+    <div className={`bg-white rounded-2xl p-${isLarge ? '6' : '4'} shadow-sm border border-gray-100 card-hover cursor-pointer fade-in-stagger btn-hover`}>
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className={`font-semibold text-gray-900 ${isLarge ? 'text-lg' : 'text-base'}`}>{name}</h3>
           <p className="text-gray-500 text-sm">{symbol}</p>
         </div>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-fast ${
           isUp === null ? 'bg-gray-100 text-gray-600' : 
           isUp ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
         }`}>
@@ -75,10 +75,10 @@ function AssetCard({ name, symbol, price, changePct, volume, isLarge = false }) 
       
       <div className="flex items-center justify-between">
         <div>
-          <p className={`font-bold ${isLarge ? 'text-2xl' : 'text-xl'} text-gray-900`}>
+          <p className={`font-bold ${isLarge ? 'text-2xl' : 'text-xl'} text-gray-900 counter-up`}>
             ${price != null ? Number(price).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : "--"}
           </p>
-          <p className={`text-sm ${changeColor} font-semibold`}>
+          <p className={`text-sm ${changeColor} font-semibold transition-fast`}>
             {changePct != null ? `${isUp ? '+' : ''}${Number(changePct).toFixed(2)}%` : "--"}
           </p>
         </div>
@@ -154,11 +154,12 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [crypto, setCrypto] = useState([]);
   const [stocks, setStocks] = useState({});
-  const [fearGreed, setFearGreed] = useState(null);
+  const [marketMetrics, setMarketMetrics] = useState(null);
   const [news, setNews] = useState([]);
 
   const [loadingCrypto, setLoadingCrypto] = useState(true);
   const [loadingNews, setLoadingNews] = useState(true);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
 
   // Get symbol from URL params or use defaults
   const urlSymbol = searchParams.get('symbol');
@@ -204,12 +205,16 @@ export default function Dashboard() {
         setStocks({});
       }
 
-      // ---- Fear & Greed (best-effort)
+      // ---- Market Metrics (Fear & Greed, Market Cap, Volume)
       try {
-        const fg = await fetchJSON("https://api.alternative.me/fng/");
-        setFearGreed(fg?.data?.[0] ?? null);
-      } catch {
-        setFearGreed(null);
+        setLoadingMetrics(true);
+        const metrics = await fetchJSON("http://localhost:5000/api/market-metrics");
+        setMarketMetrics(metrics);
+      } catch (e) {
+        console.error("Market metrics fetch error:", e);
+        setMarketMetrics(null);
+      } finally {
+        setLoadingMetrics(false);
       }
 
       // ---- Dashboard News (General market news with AI analysis)
@@ -250,28 +255,24 @@ export default function Dashboard() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <MetricCard
             title="Total Market Cap"
-            value="$1.77T"
+            value={marketMetrics?.totalMarketCap ? `$${(marketMetrics.totalMarketCap / 1e12).toFixed(2)}T` : "—"}
             sub="Global market capitalization"
-            trend="up"
+            trend={marketMetrics?.marketCapChange24h > 0 ? "up" : marketMetrics?.marketCapChange24h < 0 ? "down" : null}
           />
           <MetricCard
             title="24h Volume"
-            value="$89.5B"
+            value={marketMetrics?.total24hVolume ? `$${(marketMetrics.total24hVolume / 1e9).toFixed(1)}B` : "—"}
             sub="Total trading volume"
             trend="up"
           />
           <MetricCard
             title="Fear & Greed Index"
-            value={fearGreed ? fearGreed.value : "—"}
-            sub={fearGreed ? fearGreed.value_classification : "Unavailable"}
-          />
-          <MetricCard
-            title="Active Positions"
-            value="12"
-            sub="Portfolio holdings"
+            value={marketMetrics?.fearGreed ? marketMetrics.fearGreed.value : "—"}
+            sub={marketMetrics?.fearGreed ? marketMetrics.fearGreed.value_classification : "Loading..."}
+            trend={marketMetrics?.fearGreed?.value > 50 ? "up" : marketMetrics?.fearGreed?.value < 50 ? "down" : null}
           />
         </div>
 
