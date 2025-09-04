@@ -52,11 +52,11 @@ export default function StockDetail() {
         setLoading(true);
         
         // Fetch stock price data
-        const stockResponse = await fetchJSON(`http://localhost:5000/api/stocks?symbol=${symbol}`);
+        const stockResponse = await fetchJSON(`https://marketpulse-2025-2.onrender.com/api/stocks?symbol=${symbol}`);
         setStockData(stockResponse);
 
         // Fetch news for this stock
-        const newsResponse = await fetchJSON(`http://localhost:5000/api/news?ticker=${symbol}`);
+        const newsResponse = await fetchJSON(`https://marketpulse-2025-2.onrender.com/api/news?ticker=${symbol}`);
         setNews(newsResponse.slice(0, 3)); // Only 3 news items
 
         // Determine bull/bear trend based on price data

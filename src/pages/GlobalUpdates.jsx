@@ -168,7 +168,7 @@ export default function GlobalUpdates() {
       // Fetch tariff data
       try {
         setLoadingTariffs(true);
-        const tariffs = await fetchJSON('http://localhost:5000/api/intelligence/tariffs');
+        const tariffs = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/intelligence/tariffs');
         setTariffData(tariffs);
       } catch (error) {
         console.error('Error fetching tariff data:', error);
@@ -185,7 +185,7 @@ export default function GlobalUpdates() {
         for (const country of countries) {
           try {
             // Using NewsData.io for global news
-            const newsRes = await fetchJSON(`http://localhost:5000/api/news/global?country=${country}`);
+            const newsRes = await fetchJSON(`https://marketpulse-2025-2.onrender.com/api/news/global?country=${country}`);
             const countryNews = newsRes.map(article => ({
               ...article,
               country: country

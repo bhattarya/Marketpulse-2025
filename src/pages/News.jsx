@@ -188,7 +188,7 @@ export default function News() {
       try {
         // If a specific ticker is selected, fetch news for that ticker
         const ticker = selectedTicker || "TSLA"; // default to TSLA if no filter
-        const items = await fetchJSON(`http://localhost:5000/api/news?ticker=${ticker}`);
+        const items = await fetchJSON(`https://marketpulse-2025-2.onrender.com/api/news?ticker=${ticker}`);
         const mapped = (Array.isArray(items) ? items : []).map(normalizeNews);
         setNews(mapped);
       } catch (e) {

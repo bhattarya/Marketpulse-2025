@@ -15,8 +15,8 @@ export default function IntelligenceWidget({ onViewAll }) {
     const fetchIntelligence = async () => {
       try {
         const [intelligence, news] = await Promise.all([
-          fetchJSON("http://localhost:5000/api/intelligence?limit=3"),
-          fetchJSON("http://localhost:5000/api/news?ticker=stock%20market").then(articles => 
+          fetchJSON("https://marketpulse-2025-2.onrender.com/api/intelligence?limit=3"),
+          fetchJSON("https://marketpulse-2025-2.onrender.com/api/news?ticker=stock%20market").then(articles => 
             articles.slice(0, 3).map(article => ({
               ...article,
               type: 'news',

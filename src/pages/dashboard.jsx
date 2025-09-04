@@ -176,7 +176,7 @@ export default function Dashboard() {
       // ---- Crypto
       try {
         setLoadingCrypto(true);
-        const cryptoData = await fetchJSON("http://localhost:5000/api/crypto");
+        const cryptoData = await fetchJSON("https://marketpulse-2025-2.onrender.com/api/crypto");
         setCrypto(Array.isArray(cryptoData) ? cryptoData : []);
       } catch (e) {
         console.error("Crypto fetch error:", e);
@@ -191,7 +191,7 @@ export default function Dashboard() {
         for (const sym of stockSymbols) {
           try {
             const raw = await fetchJSON(
-              `http://localhost:5000/api/stocks?symbol=${sym}`
+              `https://marketpulse-2025-2.onrender.com/api/stocks?symbol=${sym}`
             );
             results[sym] = normalizeStock(raw, sym);
           } catch (e) {
@@ -208,7 +208,7 @@ export default function Dashboard() {
       // ---- Market Metrics (Fear & Greed, Market Cap, Volume)
       try {
         setLoadingMetrics(true);
-        const metrics = await fetchJSON("http://localhost:5000/api/market-metrics");
+        const metrics = await fetchJSON("https://marketpulse-2025-2.onrender.com/api/market-metrics");
         setMarketMetrics(metrics);
       } catch (e) {
         console.error("Market metrics fetch error:", e);
@@ -221,7 +221,7 @@ export default function Dashboard() {
       try {
         setLoadingNews(true);
         const items = await fetchJSON(
-          `http://localhost:5000/api/news/dashboard`
+          `https://marketpulse-2025-2.onrender.com/api/news/dashboard`
         );
         const mapped = (Array.isArray(items) ? items : []).map(normalizeNews);
         setNews(mapped);

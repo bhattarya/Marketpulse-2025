@@ -400,7 +400,7 @@ export default function Intelligence() {
       // Fetch tech board news
       try {
         setLoadingTech(true);
-        const techNews = await fetchJSON('http://localhost:5000/api/intelligence/tech-board');
+        const techNews = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/intelligence/tech-board');
         setTechBoardNews(techNews);
       } catch (error) {
         console.error('Error fetching tech board news:', error);
@@ -412,7 +412,7 @@ export default function Intelligence() {
       // Fetch FED data
       try {
         setLoadingFed(true);
-        const fed = await fetchJSON('http://localhost:5000/api/intelligence/fed-tracker');
+        const fed = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/intelligence/fed-tracker');
         setFedData(fed);
       } catch (error) {
         console.error('Error fetching FED data:', error);
@@ -424,7 +424,7 @@ export default function Intelligence() {
       // Fetch economic indicators
       try {
         setLoadingEconomic(true);
-        const indicators = await fetchJSON('http://localhost:5000/api/intelligence/economic-indicators');
+        const indicators = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/intelligence/economic-indicators');
         setEconomicIndicators(indicators);
       } catch (error) {
         console.error('Error fetching economic indicators:', error);
@@ -436,7 +436,7 @@ export default function Intelligence() {
       // Fetch geo-events data
       try {
         setLoadingGeoEvents(true);
-        const geoEvents = await fetchJSON('http://localhost:5000/api/intelligence/geo-events');
+        const geoEvents = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/intelligence/geo-events');
         setGeoEventsData(geoEvents);
       } catch (error) {
         console.error('Error fetching geo-events:', error);

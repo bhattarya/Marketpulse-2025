@@ -93,14 +93,14 @@ export default function AIChatbot() {
       let response;
       if (ticker && ticker.length >= 1 && ticker.length <= 5) {
         // Use stock analysis endpoint
-        response = await fetchJSON('http://localhost:5000/api/chatbot/analyze-stock', {
+        response = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/chatbot/analyze-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ticker: ticker.toUpperCase() })
         });
       } else {
         // Use general chatbot endpoint
-        response = await fetchJSON('http://localhost:5000/api/chatbot/ask', {
+        response = await fetchJSON('https://marketpulse-2025-2.onrender.com/api/chatbot/ask', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: userMessage, ticker })
