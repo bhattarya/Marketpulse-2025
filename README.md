@@ -1,16 +1,28 @@
-# MarketPulse  
+# MarketPulse 📈
+### AI-Powered Financial Intelligence Platform
 
-MarketPulse is currently a **work in progress** 🚧.  
+## Overview
+MarketPulse solves information overload in stock market research by combining 
+real-time market data, AI sentiment analysis, and SEC filing integration into 
+one clean dashboard.
 
-## Overview  
-MarketPulse aims to provide insights, analytics, and tracking for market trends.  
-More details will be added as development progresses.  
+## Features
+- 📊 Real-time financial data ingestion with interactive Chart.js visualizations
+- 🤖 AI-driven sentiment analysis on financial news using NLP
+- 📋 SEC filing integration for company fundamentals
+- 📰 Filtered stock-specific news aggregator
+- 🔗 Correlation engine for market pattern analysis
 
-## Status  
-- Active development in progress  
-- Features and documentation will be updated regularly  
+## Tech Stack
+**Frontend:** React 19, Vite, TailwindCSS, Chart.js  
+**Backend:** Node.js, Express.js, REST APIs  
+**Database:** MongoDB  
+**Deployment:** Vercel  
 
-## Getting Started  
-Setup and usage instructions will be shared soon.  
+## Security
+- API keys stored in environment variables, never exposed client-side
+- All third-party API calls proxied through Express backend
+- Input validation and sanitization on all endpoints
 
-Stay tuned for updates!
+## Live Demo
+🔗 [marketpulse-2025.vercel.app](https://marketpulse-2025.vercel.app)
