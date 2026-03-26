@@ -1,7 +1,8 @@
 const COINGECKO_API =
   'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true';
 
-const FINNHUB_API_KEY = 'd2aetnhr01qoad6pi37gd2aetnhr01qoad6pi380';
+const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
+
 const FINNHUB_API = symbol =>
   `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`;
 
